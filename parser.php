@@ -38,6 +38,7 @@ class Parser
   var $input_mapping;
   var $output_mapping;
   
+  var $key;
   var $logic_map;
   var $num_gates;
   
@@ -298,9 +299,9 @@ class Parser
   function Solve()
   {
     $key       = $this->Lookup();
+    $this->key = $key;
     $solvition = new Solver($key);
     $solvition->Solve();
-    $this->logic_map = Array();
     $this->num_gates = $solvition->num_gates;
     
     $input_mapping_reverse = Array();
@@ -308,6 +309,8 @@ class Parser
       if($v !== null)
         $input_mapping_reverse[$v] = $k;
     
+    $logic_map = Array();
+
     if($this->num_gates)
     {
       foreach($solvition->gate_from as $gateno => $inputs)

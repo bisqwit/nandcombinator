@@ -37,8 +37,8 @@ class Solver
     $row = $db->querySingle($SQL, true);
     $this->num_inputs  = $num_inputs;
     $this->num_outputs = $num_outputs;
-    $this->num_gates   = $row['gates'];
-    $connections       = $row['connections'];
+    $this->num_gates   = @$row['gates'];
+    $connections       = @$row['connections'];
 
     $dec = new BASE64decoder($connections);
     for($n=0; $n<$this->num_gates*2; ++$n)
