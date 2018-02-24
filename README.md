@@ -21,6 +21,8 @@ The process will also take a lot of time. NAND networks with few inputs
 or few gates will get built in fractions of seconds, but larger networks
 may take several days to compute, utilizing all CPU cores at maximum.
 
+Warning: The code uses GCC builtins. It compiles on GCC or Clang.
+
 ### nandcombinator
 
 The second step is to run nandcombinator.
@@ -43,6 +45,8 @@ Nandcombinator uses the `mmap` system call to map
 the gatebuilder files into its address space,
 and you really should have a 64-bit system to run this on;
 otherwise the process will be seriously hampered by architectural limits.
+
+Warning: The code uses GCC builtins. It compiles on GCC or Clang.
 
 ### import.php
 
