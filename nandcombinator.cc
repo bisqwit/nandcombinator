@@ -18,15 +18,21 @@ static constexpr unsigned global_max_inputs = 9;
 
 using state_bitmask_t
     = std::conditional_t< (global_max_gates <= 32),
+      std::uint32_t, std::uint64_t>;
+
+using saved_state_bitmask_t
+    = std::conditional_t< (global_max_gates <= 32),
       std::conditional_t< (global_max_gates <= 16),
       std::conditional_t< (global_max_gates <=  8),
       std::uint8_t, std::uint16_t>, std::uint32_t>, std::uint64_t>;
-using gate_input_bitmask_t
-    = std::conditional_t< (global_max_gates*2 <= 32), std::uint32_t, std::uint64_t>;
-using gate_bitmask_t
-    = std::conditional_t< (global_max_gates <= 32), std::uint32_t, std::uint64_t>;
 
-static constexpr unsigned min_outputs = 1, global_max_outputs = 5;
+//using result_bitmask_t
+//    = std::conditional_t< (global_max_gates*2 <= 32), std::uint32_t, std::uint64_t>;
+
+//using gate_bitmask_t
+//    = std::conditional_t< (global_max_gates <= 32), std::uint32_t, std::uint64_t>;
+
+static constexpr unsigned min_outputs = 1, global_max_outputs = 15;
 
 #include <unistd.h>
 #include <sys/fcntl.h>
@@ -49,45 +55,45 @@ static std::uint_fast64_t binomial(std::uint_fast64_t n, std::uint_fast64_t k)
 static double binomial(double n, double k)
 {
     k = std::min(k, n-k);
+    if(k < 0) return 0;
     if(!k) {return 1;} if(k==1) {return n;}
-    auto mloop = [](double a, double b)
+    if(k > 1000 || n > 1000)
     {
-        auto result = a;
-        for(double t=a+1; t<=b; ++t) result *= t;
-        return result;
-    };
-    return mloop(n-k+1, n) / mloop(2,k);
+        return std::tgamma(n+1) / (std::tgamma(n-k + 1)
+                                 * std::tgamma(k+1));
+    }
+    else
+    {
+        auto mloop = [](double a, double b)
+        {
+            auto result = a;
+            for(double t=a+1; t<=b; ++t) result *= t;
+            return result;
+        };
+        return mloop(n-k+1, n) / std::tgamma(k+1);
+    }
 }
 
+static double MaxSize[(global_max_inputs+1) * (global_max_outputs+1) + global_max_outputs ]{};
 static double CalculateMaxSize(unsigned num_inputs, unsigned num_outputs)
 {
+    auto& r = MaxSize[num_inputs*(global_max_outputs+1)+num_outputs];
+    if(__builtin_expect(r, true)) return r;
+
     // Number of rows:            1u << num_inputs
     // Number of output patterns: 1u << num_outputs
 
     // n_output_patterns ^ n_rows
-  #if 0
-    unsigned bits = (1u << num_inputs);
-    double result = std::pow(2.0, bits);
-    result -= 2 + num_inputs;
-    result = std::pow(result, num_outputs);
-  #else
     unsigned bits = (1u << num_inputs);
     double result = std::pow(2.0, bits);
     result -= 2 + num_inputs; // Remove always-0, always-1, and always-duplicate-of-input
-    result = binomial(result, num_outputs); // # unique combinations
-  #endif
-
-    /* In two input bits + 1 output, there are 16 combinations.
-     *          0000 gets removed: output is always 0
-     *          1111 gets removed: output is always 1
-     *          0101 gets removed: always duplicate of input 0
-     *          0011 gets removed: always duplicate of input 1
-     *          Number of combinations is 2 + num_inputs.
-     * For multiple outputs, it's that (number+1) ^ num_outputs - 1.
-     *
-     * +1 because it's possible that for _some_ output this didn't match,
-     * and -1 to eliminate the case where it didn't match for _any_ output.
-     */
+    if(num_inputs < 6)
+        result = binomial(result, num_outputs); // # unique combinations
+    else
+        result = std::pow(result, num_outputs);
+    if(!std::isfinite(result) || (result < 0 || result > 1e200))
+        result = 1e200;
+    r = result;
     return result;
 }
 
@@ -96,10 +102,58 @@ static std::map<unsigned, std::unordered_map<std::string,std::pair<unsigned,std:
 static std::shared_mutex io_lock;
 static FILE* logfps[(global_max_inputs+1) * (global_max_outputs+1)] {};
 
+static std::map<std::pair<unsigned/*num gates*/,unsigned/*num outputs*/>,
+                std::vector<std::pair<state_bitmask_t, std::vector<unsigned char>>>> Combinations;
+
+static void BuildCombinations(unsigned num_gates)
+{
+    for(unsigned num_outputs = min_outputs; num_outputs <= global_max_outputs; ++num_outputs)
+    {
+        // All outputs must be fed by a gate. No two outputs can feed from the same gate.
+        // This means that the number of outputs cannot exceed the number of gates.
+        if(num_outputs > num_gates)
+        {
+            continue;
+        }
+        auto& target = Combinations[std::make_pair(num_gates,num_outputs)];
+
+        std::vector<unsigned char> sys_outputs(num_outputs);
+        std::iota(sys_outputs.begin(), sys_outputs.end(), 0);
+
+        for(;;)
+        {
+            state_bitmask_t bitmask = 0;
+            for(auto n: sys_outputs) bitmask |= 1u << n;
+            target.emplace_back(std::make_pair(bitmask, sys_outputs));
+
+            unsigned o = num_outputs-1;
+        newo:
+            unsigned maxvalue = num_gates - ((num_outputs-1) - o);
+            if(++sys_outputs[o] >= maxvalue)
+            {
+                if(!o--) break; // No more sys_outputs sets
+                goto newo;
+            }
+            unsigned where = o;
+            while(o+1 < num_outputs)
+            {
+                sys_outputs[o+1] = sys_outputs[o]+1;
+                //assert(sys_outputs[o+1] < num_gates);
+                ++o;
+            }
+            assert(std::is_sorted(sys_outputs.begin(), sys_outputs.begin()+num_outputs));
+        } //Next sys_outputs set
+
+        std::printf("%u gates, %u outputs: %zu combinations\n", num_gates,num_outputs, target.size());
+    } // num_outputs
+}
+
+template<std::size_t Words>
 static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned,std::string>>& lore,
                                const unsigned char* gate_inputs,
-                               const std::array<unsigned char,global_max_outputs>&                             sys_outputs,
-                               const std::array<std::bitset< (1u << global_max_inputs) >, global_max_outputs>& results,
+                               const unsigned char* sys_outputs,
+                               //const std::array<std::bitset< (1u << global_max_inputs) >, global_max_outputs>& results,
+                               const std::array<std::array<std::uint32_t,Words>, global_max_outputs>& results,
                                unsigned num_gates,
                                unsigned num_inputs,
                                unsigned num_outputs)
@@ -108,6 +162,7 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
     std::iota(&output_order[0], &output_order[0]+num_outputs, 0);
 
     // Create an output ordering that sorts the truth tables in consistent order
+#if 0
     std::sort(output_order.begin(), output_order.begin() + num_outputs,
         [&](unsigned index1, unsigned index2)
         {
@@ -120,6 +175,26 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
             // Disallow identical outputs
             return;
         }
+#else
+    const unsigned words = ((1u << num_inputs) + 31u) / 32u;
+    for(auto begin = output_order.begin(), end = begin + num_outputs,
+             i = std::next(begin); i != end; ++i)
+    {
+        auto tmp = std::move(*i);
+        auto j   = i;
+        for(; j != begin; --j)
+        {
+            int comp = std::memcmp(&results[*std::prev(j)], &results[tmp], words*sizeof(std::uint32_t));
+            // While sorting, check for duplicate truth-tables. Disallow identical outputs.
+            if(!comp) return;
+            if(comp > 0) break;
+            *j = std::move(*std::prev(j));
+        }
+        *j = std::move(tmp);
+    }
+    //for(unsigned n=1; n<num_outputs; ++n)
+    //    assert(std::memcmp(&results[output_order[n]], &results[output_order[n-1]], sizeof(results[0])) < 0);
+#endif
 
     auto make_string = [](auto&& functor) // Like BASE64.
     {
@@ -148,20 +223,23 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
             const auto& r = results[output_order[n]];
             unsigned bits = 1u << num_inputs;
             for(unsigned pos = 0; pos < bits; ++pos)
-                addbits(r.test(pos), 1);
+            {
+                addbits( (r[pos/32u] >> (pos%32)) & 1, 1 );
+                //addbits(r.test(pos), 1);
+            }
         }
         addbits(num_inputs,  5); // Room for 31 inputs
         addbits(num_outputs, 5); // Room for 31 outputs
     });
 
-    io_lock.lock_shared();
-    auto i = lore.find(key);
+    std::unordered_map<std::string,std::pair<unsigned,std::string>>::iterator i;
+    {std::shared_lock<std::shared_mutex> lk(io_lock);
+    i = lore.find(key);
     if(i != lore.end() && i->second.first <= num_gates)
     {
-        io_lock.unlock_shared();
         return;
-    }
-    io_lock.unlock_shared();
+    }} // end scope for shared_lock
+
     std::lock_guard<std::shared_mutex> lk(io_lock);
 
     i = lore.find(key);
@@ -174,14 +252,14 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
 
     auto value = make_string([&](auto&& addbits)
     {
+        // Gate inputs: 6 bits: Room for 32 inputs, 32 gates
+        // Outputs:     5 bits: Room for 32 gates
         for(unsigned n=0; n<num_gates*2; ++n) addbits(gate_inputs[n], 6);
         for(unsigned n=0; n<num_outputs; ++n) addbits(sys_outputs[output_order[n]], 5);
     });
 
     if(__builtin_expect(i == lore.end(), true))
     {
-        // Gate inputs: 6 bits: Room for 32 inputs, 32 gates
-        // Outputs:     5 bits: Room for 32 gates
         lore.emplace(key, std::make_pair(num_gates, value));
     }
     else
@@ -189,8 +267,6 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
         assert(i->second.first > num_gates);
 
         // UPDATE
-        // Gate inputs: 6 bits: Room for 32 inputs, 32 gates
-        // Outputs:     5 bits: Room for 32 gates
         i->second.first  = num_gates;
         i->second.second = value;
 
@@ -242,102 +318,74 @@ static void Catalogue(const unsigned char* gate_inputs,
                       unsigned num_gates,
                       unsigned num_inputs)
 {
-    std::uint_fast64_t unused_gates_mask = ~(~std::uint_fast64_t() << num_gates);
-    std::uint_fast64_t unused_inputs_mask = ~(~std::uint_fast64_t() << num_inputs);
+    state_bitmask_t used_gates=0;
     for(unsigned n=0; n<num_gates*2; ++n)
         if(gate_inputs[n] >= num_inputs)
-            unused_gates_mask &= ~(std::uint_fast64_t(1) << (gate_inputs[n]-num_inputs));
-        else
-            unused_inputs_mask &= ~(std::uint_fast64_t(1) << gate_inputs[n]);
-    //if(unused_inputs_mask) return;
+            used_gates |= 1u << (gate_inputs[n]-num_inputs);
 
-    const unsigned max_outputs = std::min(num_gates,
-                                          std::min(num_inputs + num_gates+2, global_max_outputs));
-                                //std::min(global_max_outputs, (unsigned)std::max(1, 5-(int)num_inputs));
-    for(unsigned num_outputs=min_outputs; num_outputs <= max_outputs; ++num_outputs)
+    for(unsigned num_outputs = min_outputs; num_outputs <= global_max_outputs; ++num_outputs)
     {
         auto& lore = Knowledge[(num_inputs << 16) + num_outputs];
         double hyp_size = CalculateMaxSize(num_inputs, num_outputs);
 
-        if(__builtin_popcount(unused_gates_mask) > num_outputs || num_outputs > num_gates)
+        // All outputs must be fed by a gate. No two outputs can feed from the same gate.
+        // This means that the number of outputs cannot exceed the number of gates.
+        if(num_outputs > num_gates)
         {
-            /*std::fprintf(stderr, "%u outputs impossible, %u unused gates and %u gates total\n",
-                num_outputs, (int)__builtin_popcount(unused_gates_mask), num_gates);*/
+            continue;
+        }
+        // All gates must be used for something.
+        // If there are more unused gates than outputs, we cannot satisfy the condition.
+        if(num_gates - __builtin_popcount(used_gates) > num_outputs)
+        {
             continue;
         }
 
-        std::array<unsigned char,global_max_outputs> sys_outputs{};
-        std::iota(sys_outputs.begin(), sys_outputs.begin()+num_outputs, 0);
-
-        while(lore.size() < std::round(hyp_size)) // Next sys_outputs set
+        for(const auto& [state_used_gates,sys_outputs]: Combinations.find(std::make_pair(num_gates,num_outputs))->second)
         {
-            std::uint_fast64_t unused_gates = unused_gates_mask;
-            //std::uint_fast64_t unused_inputs = unused_inputs_mask;
+            if(lore.size() >= std::round(hyp_size)) break;
+            if(__builtin_popcount(used_gates | state_used_gates) != num_gates) continue;
+
+        #if 0
+            // Note: For 9 inputs, this is not a 9-bit set. This is a 2^9 = 512-bit set.
+            //       For 5 inputs, it is a 2^5 = 32 bit set.
+            std::array<std::bitset< (1u << global_max_inputs) >, global_max_outputs> results{};
+            for(unsigned truth_index = 0; truth_index < (1u << num_inputs); ++truth_index)
+            {
+                state_bitmask_t state = gate_outputs[truth_index];
+                for(unsigned n=0; n<num_outputs; ++n)
+                    if(state & (state_bitmask_t(1) << sys_outputs[n]))
+                        results[n].set(truth_index);
+            }
+        #else
+            constexpr unsigned wordbitsm = 32, bitsm = (1u<<global_max_inputs), wordsm = (bitsm+wordbitsm-1)/wordbitsm;
+            std::array< std::array<std::uint32_t, wordsm>, global_max_outputs> results{};
+            unsigned bits = 1u << num_inputs, words=(bits+wordbitsm-1)/wordbitsm;
             for(unsigned n=0; n<num_outputs; ++n)
-                unused_gates &= ~(std::uint_fast64_t(1) << sys_outputs[n]);
-            // Note: Unused inputs is not an error.
-
-            if(!unused_gates)
             {
-                std::array<std::bitset< (1u << global_max_inputs) >, global_max_outputs> results{};
-                for(unsigned truth_index = 0; truth_index < (1u << num_inputs); ++truth_index)
+                unsigned pos = sys_outputs[n];
+                for(unsigned word=0; word<words; ++word)
                 {
-                    state_bitmask_t state = gate_outputs[truth_index];
-                    for(unsigned n=0; n<num_outputs; ++n)
-                        if((state >> sys_outputs[n]) & 1)
-                            results[n].set(truth_index);
+                    std::uint32_t w=0;
+                    const auto* src = (const state_bitmask_t*)
+                        __builtin_assume_aligned(&gate_outputs[word * wordbitsm], 32);
+                    #pragma omp simd reduction(|:w)
+                    for(unsigned bit=0; bit<wordbitsm; ++bit)
+                        w |= ((src[bit] >> pos) & 1u) << bit;
+                    results[n][word] = w;
                 }
-
-#if 0
-                unsigned to_be_skipped = 0;
-                // Verify that 1) each input affected an output
-                //             2) no input bits got translated directly into output
-                // DISABLED, BECAUSE ALREADY HANDLED IN GATEBUILDER
-                for(unsigned m=0; m<num_outputs; ++m)
-                {
-                    auto c = results[m].count();
-                    // Either always zero or always set?
-                    if(c == 0 || c == (1u << num_inputs)) goto skip_to_next_output;
-                }
-                for(unsigned m=0; m<num_outputs; ++m)
-                {
-                    unsigned ok_bits = 0;
-                    for(unsigned r=0; r < (1u << num_inputs); ++r)
-                    {
-                        bool bit = results[m].test(r);
-                        for(unsigned n=0; n<num_inputs; ++n)
-                            if(!(ok_bits & (1u << n)))
-                                if(bit != bool(r & (1u << n)))
-                                    ok_bits |= 1u << n;
-                    }
-                    if(ok_bits != (1u << num_inputs)-1)
-                        goto skip_to_next_output;
-                }
-#endif
-
-                SaveOrIgnoreResult(lore,
-                                   gate_inputs,sys_outputs,results,
-                                   num_gates,num_inputs,num_outputs);
-            } // unused gates situation skips here
-
-        //skip_to_next_output:;
-            unsigned o = num_outputs-1;
-        newo:
-            if(++sys_outputs[o] >= num_gates)
-            {
-                if(!o--) break; // No more sys_outputs sets
-                goto newo;
             }
-            unsigned where = o;
-            while(o+1 < num_outputs)
-            {
-                sys_outputs[o+1] = sys_outputs[o]+1;
-                if(sys_outputs[o+1] >= num_gates) { o=where; goto newo; }
-                ++o;
-            }
-            assert(std::is_sorted(sys_outputs.begin(), sys_outputs.begin()+num_outputs));
-            //if(!std::is_sorted(sys_outputs.begin(), sys_outputs.begin()+num_outputs)) { o=num_outputs-1; goto newo; }
-        } //Next sys_outputs set
+        #endif
+
+            // We only take inputs from NAND gate outputs.
+            // Gatebuilder already makes sure that no NAND gate produces
+            // a constant zero, constant one, or a duplicate of any input,
+            // so there is no need to check for that situation.
+
+            SaveOrIgnoreResult(lore,
+                               gate_inputs,&sys_outputs[0],results,
+                               num_gates,num_inputs,num_outputs);
+        }
     } // num_outputs
 }
 
@@ -349,10 +397,8 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
     auto test_missing = [&]()
     {
         bool missing = false;
-        const unsigned max_outputs = std::min(num_gates+4u,
-                                              std::min(num_inputs + num_gates+2, global_max_outputs));
-        io_lock.lock_shared();
-        for(unsigned num_outputs=min_outputs; num_outputs <= max_outputs; ++num_outputs)
+        std::shared_lock<std::shared_mutex> lk(io_lock);
+        for(unsigned num_outputs=min_outputs; num_outputs <= global_max_outputs; ++num_outputs)
         {
             auto& lore = Knowledge[(num_inputs << 16) + num_outputs];
             auto current_size = lore.size();
@@ -369,7 +415,6 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
             }
             missing = true;
         }
-        io_lock.unlock_shared();
         return missing;
     };
     if(!test_missing())
@@ -389,8 +434,8 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
     }
 
     std::size_t gate_record_size   = num_gates*2;
-    std::size_t output_record_size = sizeof(state_bitmask_t) * (1u << num_inputs);
-    std::size_t record_size = gate_record_size + output_record_size;
+    std::size_t output_record_size = sizeof(saved_state_bitmask_t) * (1u << num_inputs);
+    std::size_t record_size        = gate_record_size + output_record_size;
 
     std::vector<std::tuple<std::atomic<std::size_t>/*record ptr*/,
                            MemMappingType<true>    /*mmap*/,
@@ -459,20 +504,40 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
 
                 auto& mmap = std::get<1>(files[filenum]);
 
+                unsigned pmul = 32;
+                auto paddr = std::uint_fast64_t( mmap.get_ptr() + record*record_size ) / MMAP_PAGESIZE;
+                if(!(paddr % pmul))
+                {
+                    /*
+                    madvise( (void*) ((paddr-pmul) * MMAP_PAGESIZE ),
+                             ( group*record_size + MMAP_PAGESIZE*pmul-1) & ~(MMAP_PAGESIZE*pmul-1),
+                             MADV_DONTNEED );
+                    */
+
+                    madvise( (void*) (paddr * MMAP_PAGESIZE ),
+                             ( group*record_size + MMAP_PAGESIZE*pmul-1) & ~(MMAP_PAGESIZE*pmul-1),
+                             MADV_SEQUENTIAL | MADV_WILLNEED );
+                }
+
                 for(std::size_t b=0; b<group; ++b)
                 {
                     std::size_t recordnum = record + b;
                     if(recordnum >= num_records) break;
 
-                    unsigned char   gate_inputs[gate_record_size];
-                    state_bitmask_t results[1u << global_max_inputs];
+                    unsigned char         gate_inputs[gate_record_size];
+                    saved_state_bitmask_t results[1u << global_max_inputs]{};
+                    state_bitmask_t       outputs[1u << global_max_inputs];
 
                     auto ptr = mmap.get_ptr() + recordnum*record_size;
 
                     std::memcpy(gate_inputs, ptr+0,                gate_record_size);
                     std::memcpy(results,     ptr+gate_record_size, output_record_size);
 
-                    Catalogue(gate_inputs, results, num_gates,num_inputs);
+                    #pragma omp simd
+                    for(unsigned n=0; n < (1u << global_max_inputs); ++n)
+                        outputs[n] = results[n];
+
+                    Catalogue(gate_inputs, outputs, num_gates,num_inputs);
                 }
 
                 if(!test_missing()) break;
@@ -486,12 +551,17 @@ int main()
 {
     for(unsigned i=0; i<=global_max_inputs; ++i)
         for(unsigned o=min_outputs; o<=global_max_outputs; ++o)
+        {
             Knowledge[ (i<<16) + o ];
+            CalculateMaxSize(i,o); // Prefill MaxSize
+        }
 
     std::vector<unsigned> choices;
     for(unsigned num_inputs=1; num_inputs<=global_max_inputs; ++num_inputs)
-    for(unsigned num_gates=0; num_gates<=global_max_gates; ++num_gates)
+    for(unsigned num_gates=1; num_gates<=global_max_gates; ++num_gates)
     {
+        //if(num_gates>5)continue;
+        //if(num_inputs<6)continue;
         choices.push_back( (num_inputs<<10) + (num_gates<<0) );
     }
 
@@ -510,6 +580,11 @@ int main()
         */
         return a2 != b2 ? a2 < b2 : a3 < b3;
     });
+
+    for(unsigned num_gates=1; num_gates<=global_max_gates; ++num_gates)
+    {
+        BuildCombinations(num_gates);
+    }
 
     for(unsigned choice: choices)
     {
