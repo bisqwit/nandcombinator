@@ -1,5 +1,7 @@
 <?php
 
+if(!empty($_SERVER)) exit;
+
 $path = '/mnt/nand/';
 if(!file_exists($path)) $path = '.';
 

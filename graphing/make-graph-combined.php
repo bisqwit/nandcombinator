@@ -1,5 +1,7 @@
 <?php
-require 'base64.php';
+require_once 'base64.php';
+
+if(!empty($_SERVER)) exit;
 
 $num_inputs  = 2;
 $num_outputs = 1;

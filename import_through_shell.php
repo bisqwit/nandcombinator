@@ -1,5 +1,11 @@
 <?php
-foreach(glob('/mnt/nand/datalog_*.dat') as $filename)
+
+if(!empty($_SERVER)) exit;
+
+$path = '/mnt/nand/';
+if(!file_exists($path)) $path = '.';
+
+foreach(glob($path.'datalog_*.dat') as $filename)
 {
   preg_match('/datalog_(\d+)_(\d+)/', $filename, $mat);
   $inputs  = $mat[1];
