@@ -2,6 +2,7 @@
 
 require 'parser.php';
 require 'predefs.php';
+require 'possible304.php';
 
 $function = @$_REQUEST['f'] or '0';
 if(isset($argv))
@@ -14,6 +15,11 @@ $n->Parse($function);
 $n->Evaluate();
 $n->Analyze();
 $n->Solve();
+
+if($n->num_gates)
+{
+  Check304(Array('calc.php','parser.php','solver.php'));
+}
 
 #print_r($n);
 

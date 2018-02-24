@@ -2,6 +2,7 @@
 
 require_once 'base64.php';
 require_once 'solver.php';
+require_once 'smallcache.php';
 
 define('NAME_REGEX', '[A-Za-z_][A-Za-z_0-9]*(?:\[[0-9]+\])?');
 define('PORT_REGEX', '[A-Za-z_][A-Za-z_0-9]*(?:\[[0-9]+\])?(?:\\.'.NAME_REGEX.')?');
@@ -27,6 +28,30 @@ foreach($mat[1] as $k=>$v)
   $tokens[$k] = $k;
   $tokens[$v] = $v;
   $connections[$v][] = $k;
+}
+
+$pagetime = filemtime('img.php');
+if(isset($_SERVER['HTTP_IF_MODIFIED_SINCE']))
+  if(strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']) >= $pagetime)
+  {
+    header('HTTP/1.0 304 Not modified indeed');
+    print 'You should use the version you have cached. ';
+    print 'Why I am talking English with a web browser?';
+    exit;
+  }
+
+$cache_key = serialize($key).serialize($connections).$pagetime;
+$cache = new BinKeyCache($cache_key);
+$cache_data = $cache->LoadOrLog();
+if($cache_data !== false)
+{
+  header('Content-type: image/png');
+  header('Content-length: '.strlen($cache_data));
+  header('Last-Modified: '.gmdate('D, d M Y H:i:s', $pagetime).' GMT');
+  header('Expires: Tue, Jan 19 2038 05:00:00 GMT');
+  header('ETag: '.md5($cache_key));
+  print $cache_data;
+  return;
 }
 
 $s = new Solver($key);
@@ -190,6 +215,7 @@ foreach($connections as $to => $inputs)
     $negshift = 0.4;//rand(40,60)/100;//0.25;
     if(!$source_is_gate)
     {
+      $negshift += 1;
       print "  \\draw ($in) -| ([xshift=-{$negshift}cm]$out) -- ($out);\n";
     }
     else
@@ -264,4 +290,10 @@ exec("cd $outdir; gs -sstdout=%stderr -dQUIET -dSAFER -dBATCH -dNOPAUSE -dNOPROM
 
 header('Content-type: image/png');
 header('Content-length: '.filesize($pngfn));
+header('Last-Modified: '.gmdate('D, d M Y H:i:s', $pagetime).' GMT');
+header('Expires: Tue, Jan 19 2038 05:00:00 GMT');
+header('ETag: '.md5($cache_key));
+
 readfile($pngfn);
+
+$cache->Save(ob_get_contents());

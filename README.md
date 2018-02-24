@@ -5,6 +5,8 @@ to implement logic functions.
 
 Front-end is at: https://bisqwit.iki.fi/utils/nandcombiner
 
+![Snapshot](images/sample.png)
+
 ## Programs
 
 ### gatebuilder
