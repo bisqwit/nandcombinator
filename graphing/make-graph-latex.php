@@ -1,7 +1,7 @@
 <?php
 require_once 'base64.php';
 
-if(!empty($_SERVER)) exit;
+if(!empty($_SERVER['REMOTE_ADDR'])) exit;
 
 $num_inputs  = 2;
 $num_outputs = 1;

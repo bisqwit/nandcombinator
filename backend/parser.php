@@ -41,6 +41,7 @@ class Parser
   var $key;
   var $logic_map;
   var $num_gates;
+  var $parse_errors;
   
   function __construct()
   {
@@ -55,8 +56,13 @@ class Parser
   //                $interpreter_phrases[]
   function Parse($phrase)
   {
-    foreach(preg_split('/[,;]/', $phrase) as $index => $sub_phrase)
-      $this->ParseOne(trim($sub_phrase), $index);
+    $index = 0;
+    foreach(preg_split('/[,;]+/', $phrase) as $sub_phrase)
+    {
+      $s = trim($sub_phrase);
+      if(strlen($s))
+       $this->ParseOne($s, $index++);
+    }
   }
 
   function ParseOne($phrase, $index)
@@ -110,12 +116,8 @@ class Parser
     if(count($stack1) != 1) { ++$errors; }
     if(empty($stack1)) $this->interpreted_phrases[$name] = Array('?', '?');
     else               $this->interpreted_phrases[$name] = Array(array_pop($stack1), array_pop($stack2));
-    if($errors)
-    {
-      foreach($this->interpreted_phrases[$name] as &$s)
-        $s .= " ($errors parse errors)";
-      unset($s);
-    }
+
+    $this->parse_errors = $errors;
   }
   
   // Evalute: Input: $phrases[], $operations[], $variables[]
@@ -194,11 +196,12 @@ class Parser
           $has_zero[$m][] = $value;
     }
 
+    $this->unused_variables = Array();
     $discard_variable_mask = 0;
     for($m=0; $m<$num_inputs; ++$m)
       if($has_zero[$m] == $has_one[$m])
       {
-        $this->unused_variables[-($m+1)] = $m;
+        $this->unused_variables[] = $this->varnames[-($m+1)];
         $discard_variable_mask |= 1 << $m;
       }
     
@@ -454,6 +457,7 @@ class Parser
       {
         // Parse error
         array_pop($stack);
+        ++$this->parse_errors;
         continue;
       }
       $output[] = array_pop($stack);

@@ -26,9 +26,15 @@ class Solver
     if(!$num_inputs || !$num_outputs)
       return;
     
-    $SQL = "SELECT * FROM conundrum WHERE logic='$key'";
+    $SQL = "SELECT * FROM conundrum WHERE logic='".SQlite3::escapeString($key)."'";
     
-    $fn  = sprintf("databases/db_%02din%02dout.db", $num_inputs, $num_outputs);
+    $path = 'databases/';
+    if(!file_exists($path))
+    {
+      $path = "../$path";
+    }
+
+    $fn  = sprintf("%sdb_%02din%02dout.db", $path, $num_inputs, $num_outputs);
     if(!file_exists($fn))
       return;
     

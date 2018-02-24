@@ -1,6 +1,6 @@
 <?php
 
-if(!empty($_SERVER)) exit;
+if(!empty($_SERVER['REMOTE_ADDR'])) exit;
 
 $path = '/mnt/nand/';
 if(!file_exists($path)) $path = '.';
