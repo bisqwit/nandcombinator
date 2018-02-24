@@ -3,6 +3,8 @@
 A toolset to calculate the minimal set of 2-input NAND gates
 to implement logic functions.
 
+Front-end is at: https://bisqwit.iki.fi/utils/nandcombiner
+
 ## Programs
 
 ### gatebuilder
