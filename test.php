@@ -5,7 +5,7 @@ require 'predefs.php';
 
 $n = new Parser;
 
-$n->Parse($predefs['XNOR']);
+$n->Parse($predefs['FULLADDER']);
 $n->Evaluate();
 $n->Analyze();
 $n->Solve();

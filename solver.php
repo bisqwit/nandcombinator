@@ -28,14 +28,13 @@ class Solver
     
     $SQL = "SELECT * FROM conundrum WHERE logic='$key'";
     
-    $fn  = sprintf("db_%02din%02dout.db", $num_inputs, $num_outputs);
+    $fn  = sprintf("databases/db_%02din%02dout.db", $num_inputs, $num_outputs);
     if(!file_exists($fn))
       return;
     
     #print "Opening $fn\n";
     $db  = new SQlite3($fn, SQLITE3_OPEN_READONLY);
-    $result = $db->query($SQL);
-    $row    = $result->fetchArray(SQLITE3_ASSOC);
+    $row = $db->querySingle($SQL, true);
     $this->num_inputs  = $num_inputs;
     $this->num_outputs = $num_outputs;
     $this->num_gates   = $row['gates'];

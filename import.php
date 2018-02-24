@@ -1,5 +1,9 @@
 <?php
-foreach(glob('/mnt/nand/datalog_*.dat') as $filename)
+
+$path = '/mnt/nand/';
+if(!file_exists($path)) $path = '.';
+
+foreach(glob($path.'datalog_*.dat') as $filename)
 {
   preg_match('/datalog_(\d+)_(\d+)/', $filename, $mat);
   $inputs  = $mat[1];
@@ -10,43 +14,40 @@ foreach(glob('/mnt/nand/datalog_*.dat') as $filename)
   #                            ceil(((2^inputs)*outputs+5+5)/6) characters (max. 174765 characters)
   # Length of connections:     ceil((num_gates*2*6+num_outputs*5)/6) characters (max. 46 characters)
   # Assuming max 16 inputs, 16 outputs, 16 gates
-  $SQLfn = sprintf("db_%02din%02dout.sql", $inputs, $outputs);
-  $fo = fopen($SQLfn, "w");
 
-  fprintf($fo, "
+  $DBfn = sprintf("db_%02din%02dout.db", $inputs, $outputs);
+  print "Creating {$DBfn}...\n";
+  $db = new SQlite3($DBfn, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+
+  $db->exec("
 CREATE TABLE conundrum(
   gates       INT NOT NULL,
   logic       TEXT NOT NULL,
   connections VARCHAR(46) NOT NULL,
   PRIMARY KEY(logic)
-);
-DELETE FROM conundrum;
-");
+)");
+  $db->exec("DELETE FROM conundrum");
 
   $n = 0;
   while(($s = fgets($fp,4096)) !== false)
   {
     $w = explode(' ', trim($s));
-    $gates = $w[0];
-    $logic = $w[1];
-    $connections = $w[2];
+    $gates = $w[0];       // integer
+    $logic = $w[1];       // base64; no chars needing escape
+    $connections = $w[2]; // base64; no chars needing escape
 
-    if($n==0) fprintf($fo, "begin transaction;\n");
+    if($n==0) $db->exec("BEGIN TRANSACTION");
 
-    $SQL = "insert into conundrum(gates,logic,connections)values($gates,'$logic','$connections')";
-    fprintf($fo, "%s;\n", $SQL);
+    $db->exec("INSERT INTO conundrum(gates,logic,connections)VALUES($gates,'$logic','$connections')");
     
     if(++$n == 16384)
     {
-      fprintf($fo, "commit;\n");
+      $db->exec("COMMIT");
       $n=0;
     }
   }
-  if($n) fprintf($fo, "commit;\n");
+  if($n) $db->exec("COMMIT");
   fclose($fp);
-  fclose($fo);
 
-  $DBfn = sprintf("db_%02din%02dout.db", $inputs, $outputs);
-  @unlink($DBfn);
-  print "sqlite3 $DBfn < $SQLfn; rm $SQLfn\n";
+  unset($db);
 }

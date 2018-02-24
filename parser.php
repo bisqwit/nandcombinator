@@ -331,7 +331,7 @@ class Parser
         case 'i': $logic_map[$name] = $this->varnames[-($n+1)]; break;
         case 'o':
           $source = $solvition->out_from[$n];
-          if(isset($source))
+          if($this->num_gates)
           {
             $n = (int)substr($source, 1);
             $logic_map[$name] = "g{$n}.out";
