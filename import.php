@@ -47,6 +47,6 @@ DELETE FROM conundrum;
   fclose($fo);
 
   $DBfn = sprintf("db_%02din%02dout.db", $inputs, $outputs);
-  unlink($DBfn);
-  print "sqlite $DBfn < $SQLfn; rm $SQLfn\n";
+  @unlink($DBfn);
+  print "sqlite3 $DBfn < $SQLfn; rm $SQLfn\n";
 }

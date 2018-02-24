@@ -134,7 +134,7 @@ static void BuildCombinations(unsigned num_gates)
                 if(!o--) break; // No more sys_outputs sets
                 goto newo;
             }
-            unsigned where = o;
+            //unsigned where = o;
             while(o+1 < num_outputs)
             {
                 sys_outputs[o+1] = sys_outputs[o]+1;
@@ -184,7 +184,12 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
         auto j   = i;
         for(; j != begin; --j)
         {
-            int comp = std::memcmp(&results[*std::prev(j)], &results[tmp], words*sizeof(std::uint32_t));
+            int comp = 0;
+            const auto& a = results[*std::prev(j)];
+            const auto& b = results[tmp];
+            for(unsigned w=words; w-- > 0; ) { comp = a[w] - b[w]; if(comp) break; }
+
+            //int comp = std::memcmp(&a, &b, words*sizeof(std::uint32_t));
             // While sorting, check for duplicate truth-tables. Disallow identical outputs.
             if(!comp) return;
             if(comp > 0) break;
@@ -218,6 +223,8 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
     };
     auto key = make_string([&](auto&& addbits)
     {
+        addbits(num_inputs,  5); // Room for 31 inputs
+        addbits(num_outputs, 5); // Room for 31 outputs
         for(unsigned n=0; n<num_outputs; ++n)
         {
             const auto& r = results[output_order[n]];
@@ -228,8 +235,6 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
                 //addbits(r.test(pos), 1);
             }
         }
-        addbits(num_inputs,  5); // Room for 31 inputs
-        addbits(num_outputs, 5); // Room for 31 outputs
     });
 
     std::unordered_map<std::string,std::pair<unsigned,std::string>>::iterator i;
@@ -560,6 +565,7 @@ int main()
     for(unsigned num_inputs=1; num_inputs<=global_max_inputs; ++num_inputs)
     for(unsigned num_gates=1; num_gates<=global_max_gates; ++num_gates)
     {
+        if(num_inputs != 2) continue;
         //if(num_gates>5)continue;
         //if(num_inputs<6)continue;
         choices.push_back( (num_inputs<<10) + (num_gates<<0) );

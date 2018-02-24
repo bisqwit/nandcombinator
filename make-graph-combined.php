@@ -1,31 +1,5 @@
 <?php
-class Decoder
-{
-  var $data;
-  var $cache_data,$cache_bits, $pos;
-  
-  function __construct($s) { $this->data = $s; $this->cache_data=0; $this->cache_bits=0; $this->pos=0; }
-  function CountBits()
-  {
-    return strlen($data)*6;
-  }
-  function Get($n)
-  {
-    while($this->cache_bits < $n)
-    {
-      $c = $this->data[$this->pos++];
-      $p = strpos('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/', $c);
-      $this->cache_data >>= 6;
-      $this->cache_data += $p;
-      #$this->cache_data += ($p << $this->cache_bits);
-      $this->cache_bits += 6;
-    }
-    $result = $this->cache_data & ((1 << $n)-1);
-    $this->cache_data >>= $n;
-    $this->cache_bits -= $n;
-    return $result;
-  }
-};
+require 'base64.php';
 
 $num_inputs  = 2;
 $num_outputs = 1;
@@ -39,8 +13,8 @@ $input = '5 J BBABADCEDFI';
 
 $tokens = explode(' ', $input);
 $num_gates   = (int)$tokens[0];
-$truthtable  = new Decoder($tokens[1]);
-$connections = new Decoder($tokens[2]);
+$truthtable  = new BASE64decoder($tokens[1]);
+$connections = new BASE64decoder($tokens[2]);
 
 // Parse connections
 $gate_from    = Array();
