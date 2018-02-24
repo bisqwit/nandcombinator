@@ -13,6 +13,9 @@
 #include <thread>
 #include <atomic>
 #include <cstring>
+
+#include "builtin.hh"
+
 static constexpr unsigned global_max_gates  = 16;
 static constexpr unsigned global_max_inputs = 9;
 
@@ -78,7 +81,7 @@ static double MaxSize[(global_max_inputs+1) * (global_max_outputs+1) + global_ma
 static double CalculateMaxSize(unsigned num_inputs, unsigned num_outputs)
 {
     auto& r = MaxSize[num_inputs*(global_max_outputs+1)+num_outputs];
-    if(__builtin_expect(r, true)) return r;
+    if(likely(r)) return r;
 
     // Number of rows:            1u << num_inputs
     // Number of output patterns: 1u << num_outputs
@@ -263,7 +266,7 @@ static void SaveOrIgnoreResult(std::unordered_map<std::string,std::pair<unsigned
         for(unsigned n=0; n<num_outputs; ++n) addbits(sys_outputs[output_order[n]], 5);
     });
 
-    if(__builtin_expect(i == lore.end(), true))
+    if(likely(i == lore.end()))
     {
         lore.emplace(key, std::make_pair(num_gates, value));
     }
@@ -341,7 +344,7 @@ static void Catalogue(const unsigned char* gate_inputs,
         }
         // All gates must be used for something.
         // If there are more unused gates than outputs, we cannot satisfy the condition.
-        if(num_gates - __builtin_popcount(used_gates) > num_outputs)
+        if(num_gates - PopulationCount(used_gates) > num_outputs)
         {
             continue;
         }
@@ -349,7 +352,7 @@ static void Catalogue(const unsigned char* gate_inputs,
         for(const auto& [state_used_gates,sys_outputs]: Combinations.find(std::make_pair(num_gates,num_outputs))->second)
         {
             if(lore.size() >= std::round(hyp_size)) break;
-            if(__builtin_popcount(used_gates | state_used_gates) != num_gates) continue;
+            if(PopulationCount(used_gates | state_used_gates) != num_gates) continue;
 
         #if 0
             // Note: For 9 inputs, this is not a 9-bit set. This is a 2^9 = 512-bit set.
@@ -372,8 +375,7 @@ static void Catalogue(const unsigned char* gate_inputs,
                 for(unsigned word=0; word<words; ++word)
                 {
                     std::uint32_t w=0;
-                    const auto* src = (const state_bitmask_t*)
-                        __builtin_assume_aligned(&gate_outputs[word * wordbitsm], 32);
+                    const auto* src = assume_aligned(&gate_outputs[word * wordbitsm], 32);
                     #pragma omp simd reduction(|:w)
                     for(unsigned bit=0; bit<wordbitsm; ++bit)
                         w |= ((src[bit] >> pos) & 1u) << bit;

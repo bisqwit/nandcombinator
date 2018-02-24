@@ -11,6 +11,7 @@
 #include <cstring>
 
 #include <omp.h>
+#include "builtin.hh"
 
 static constexpr unsigned global_max_gates  = 16;
 static constexpr unsigned global_max_inputs = 9;
@@ -100,11 +101,7 @@ static state_bitmask_t Catalogue(const unsigned char* gate_inputs, unsigned num_
         #pragma omp simd
         for(unsigned m=0; m < max_inputs_rounded_up; ++m) bad_gates |= ~has_differing_inputs[m];
     }
-    if(bad_gates & all_gatebits) return __builtin_ffsl(bad_gates);
-
-    //for(unsigned m=0; m<num_inputs; ++m)
-    //    //std::printf("zero %08X one %08X bad %08X ind=%d\n", has_zero,has_one,bad_gates, __builtin_ffsl(bad_gates));
-    //    {unsigned r = __builtin_ffsl(no_differing_inputs[m]); if(r && r <= num_gates) return r;}
+    if(bad_gates & all_gatebits) return FindFirstBit(bad_gates)+1;
 
     unsigned thr = omp_get_thread_num();
     assert(thr < MAX_THREADS);
@@ -153,7 +150,7 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
     for(unsigned fourth = 0; fourth < num_inputs+1; ++fourth)
     {
         if(first > second || third > fourth) reloop:continue;
-        if(__builtin_expect(num_gates==1, false))
+        if(unlikely(num_gates==1))
             {if(third||fourth)continue;}
         else
             {if(!third&&!fourth)continue;}
@@ -221,7 +218,7 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
             for(unsigned n=1; n<num_gates; ++n)
             {
                 unsigned b1 = gate_inputs[n*2+0], b2 = gate_inputs[n*2+1]; // Later
-                if(__builtin_expect(b1 > b2, false)) goto inc; // Verify ordering
+                if(unlikely(b1 > b2)) goto inc; // Verify ordering
                 for(unsigned m=0; m<n; ++m)
                 {
                     unsigned a1 = gate_inputs[m*2+0], a2 = gate_inputs[m*2+1]; // Earlier
