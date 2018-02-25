@@ -29,21 +29,25 @@ foreach(glob($path.'datalog_*.dat') as $filename)
   print "Creating {$DBfn}...\n";
   $db = new SQlite3($DBfn, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
 
+  $db->exec("PRAGMA journal_mode = OFF");
+  $db->exec("DROP TABLE conundrum");
   $db->exec("
 CREATE TABLE conundrum(
   gates       INT NOT NULL,
   logic       TEXT NOT NULL,
-  connections VARCHAR(46) NOT NULL,
-  PRIMARY KEY(logic)
+  connections VARCHAR(46) NOT NULL
 )");
-  $db->exec("CREATE INDEX g ON conundrum(gates)");
-  $db->exec("DELETE FROM conundrum");
+  $db->exec("PRAGMA journal_mode = OFF");
   
   $n   = 0;
   $SQL = '';
 
+  $lines = 0;
+  print "- Reading data...\n";
   while(($s = fgets($fp,65536)) !== false)
   {
+    if(++$lines % 100 == 0) { print "\r$lines"; flush(); }
+
     $w = explode(' ', trim($s));
     $gates = $w[0];       // integer
     $logic = $w[1];       // base64; no chars needing escape
@@ -52,7 +56,7 @@ CREATE TABLE conundrum(
     if(!strlen($SQL)) $SQL = "INSERT INTO conundrum(gates,logic,connections)VALUES($gates,'$logic','$connections')";
     else              $SQL .=                                                   ",($gates,'$logic','$connections')";
 
-    if(strlen($SQL) >= 1048576)
+    if(strlen($SQL) >= 1048576*128)
     {
       #if(!$n) $db->exec('BEGIN TRANSACTION');
 
@@ -68,6 +72,25 @@ CREATE TABLE conundrum(
   if(strlen($SQL) > 0) $db->exec($SQL);
   #if($n) $db->exec("COMMIT");
   fclose($fp);
+
+  print "- Adding index\n";
+  $db->exec("PRAGMA journal_mode = OFF");
+  $db->exec("BEGIN TRANSACTION");
+  $db->exec("PRAGMA journal_mode = OFF");
+  $db->exec("ALTER TABLE conundrum RENAME TO temp");
+  $db->exec("
+CREATE TABLE conundrum(
+  gates       INT NOT NULL,
+  logic       TEXT NOT NULL,
+  connections VARCHAR(46) NOT NULL,
+  PRIMARY KEY(logic)
+)");
+  $db->exec("INSERT INTO conundrum SELECT * FROM temp");
+  $db->exec("CREATE INDEX g ON conundrum(gates)");
+  $db->exec("COMMIT");
+  $db->exec("PRAGMA journal_mode = OFF");
+  print "- Complete\n";
+  $db->exec("DROP TABLE temp");
 
   unset($db);
 }

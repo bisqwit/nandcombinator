@@ -1,6 +1,7 @@
 <?php
 
 require_once 'base64.php';
+require_once 'sqlsets.php';
 
 class Solver
 {
@@ -22,29 +23,21 @@ class Solver
     $dec = new BASE64decoder($key);
     $num_inputs  = $dec->Get(5);
     $num_outputs = $dec->Get(5);
+    $num_gates   = null;
+    $connections = '';
 
     if(!$num_inputs || !$num_outputs)
       return;
     
-    $SQL = "SELECT * FROM conundrum WHERE logic='".SQlite3::escapeString($key)."'";
-    
-    $path = 'databases/';
-    if(!file_exists($path))
-    {
-      $path = "../$path";
-    }
+    $db = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+    $tablename = sprintf("conundrum_%d_%d", $num_inputs, $num_outputs);
 
-    $fn  = sprintf("%sdb_%02din%02dout.db", $path, $num_inputs, $num_outputs);
-    if(!file_exists($fn))
-      return;
-    
-    #print "Opening $fn\n";
-    $db  = new SQlite3($fn, SQLITE3_OPEN_READONLY);
-    $row = $db->querySingle($SQL, true);
-    $this->num_inputs  = $num_inputs;
-    $this->num_outputs = $num_outputs;
-    $this->num_gates   = @$row['gates'];
-    $connections       = @$row['connections'];
+    $stmt = $db->prepare("SELECT gates,connections FROM $tablename WHERE logic=?");
+    $stmt->bind_param('s', $key);
+    $stmt->execute();
+    $stmt->bind_result($this->num_gates, $connections);
+    $stmt->fetch();
+    unset($db);
 
     $dec = new BASE64decoder($connections);
     for($n=0; $n<$this->num_gates*2; ++$n)

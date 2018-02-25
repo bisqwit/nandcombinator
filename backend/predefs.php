@@ -7,35 +7,27 @@ $predefs = [
   "XOR" => "x XOR y",
   "XNOR"=> "x XNOR y",
   "NOT" => "!x",
+  
+  "ALL_OF_ABOVE" => "andresult := x ∧ y,  nandresult := x ¬∧ y,\n".
+                    "orresult  := x ∨ y,  norresult  := x ¬∨ y,\n".
+                    "xorresult := x ⊕ y,  xnorresult := x ¬⊕ y,\n".
+                    "impresult := x->y,  notx := !x, noty := ~y",
 
   "HALFADDER"   => "out := x XOR y,\ncarry := x AND y",
-  "HALFADDER2B" => "out[1]   :=  x[1] XOR y[1];\n".
-                   "carry[1] :=  x[1] AND y[1];\n".
-                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n".
-                   "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1])",
-  "HALFADDER4B" => "out[1]   :=  x[1] XOR y[1];\n".
-                   "carry[1] :=  x[1] AND y[1];\n".
-                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n".
-                   "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1]);\n".
-                   "out[3]   :=  x[3] XOR x[3] XOR carry[2];\n".
-                   "carry[3] := (x[3] AND y[3])OR(x[3] AND carry[2])OR(y[3] AND carry[2]);\n".
-                   "out[4]   :=  x[4] XOR x[4] XOR carry[3];\n".
-                   "carry[4] := (x[4] AND y[4])OR(x[4] AND carry[3])OR(y[4] AND carry[3])",
+  "HALFADDER2B" => "out[1]   :=  x[1] XOR y[1];\n".              "carry[1] :=  x[1] AND y[1];\n".
+                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n". "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1])",
+  "HALFADDER4B" => "out[1]   :=  x[1] XOR y[1];\n".              "carry[1] :=  x[1] AND y[1];\n".
+                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n". "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1]);\n".
+                   "out[3]   :=  x[3] XOR x[3] XOR carry[2];\n". "carry[3] := (x[3] AND y[3])OR(x[3] AND carry[2])OR(y[3] AND carry[2]);\n".
+                   "out[4]   :=  x[4] XOR x[4] XOR carry[3];\n". "carry[4] := (x[4] AND y[4])OR(x[4] AND carry[3])OR(y[4] AND carry[3])",
 
-  "FULLADDER"   => "out := x XOR y XOR carryIn,\n".
-                   "carryOut := (x AND y)OR(x AND carryIn)OR(y AND carryIn)",
-  "FULLADDER2B" => "out[1]   :=  x[1] XOR y[1] XOR carryIn;\n".
-                   "carry[1] := (x[1] AND y[1])OR(x[1] AND carryIn)OR(y[1] AND carryIn);\n".
-                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n".
-                   "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1])",
-  "FULLADDER4B" => "out[1]   :=  x[1] XOR y[1] XOR carryIn;\n".
-                   "carry[1] := (x[1] AND y[1])OR(x[1] AND carryIn)OR(y[1] AND carryIn);\n".
-                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n".
-                   "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1]);\n".
-                   "out[3]   :=  x[3] XOR x[3] XOR carry[2];\n".
-                   "carry[3] := (x[3] AND y[3])OR(x[3] AND carry[2])OR(y[3] AND carry[2]);\n".
-                   "out[4]   :=  x[4] XOR x[4] XOR carry[3];\n".
-                   "carry[4] := (x[4] AND y[4])OR(x[4] AND carry[3])OR(y[4] AND carry[3])",
+  "FULLADDER"   => "out := x XOR y XOR carryIn,\n".              "carryOut := (x AND y)OR(x AND carryIn)OR(y AND carryIn)",
+  "FULLADDER2B" => "out[1]   :=  x[1] XOR y[1] XOR carryIn;\n".  "carry[1] := (x[1] AND y[1])OR(x[1] AND carryIn)OR(y[1] AND carryIn);\n".
+                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n". "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1])",
+  "FULLADDER4B" => "out[1]   :=  x[1] XOR y[1] XOR carryIn;\n".  "carry[1] := (x[1] AND y[1])OR(x[1] AND carryIn)OR(y[1] AND carryIn);\n".
+                   "out[2]   :=  x[2] XOR x[2] XOR carry[1];\n". "carry[2] := (x[2] AND y[2])OR(x[2] AND carry[1])OR(y[2] AND carry[1]);\n".
+                   "out[3]   :=  x[3] XOR x[3] XOR carry[2];\n". "carry[3] := (x[3] AND y[3])OR(x[3] AND carry[2])OR(y[3] AND carry[2]);\n".
+                   "out[4]   :=  x[4] XOR x[4] XOR carry[3];\n". "carry[4] := (x[4] AND y[4])OR(x[4] AND carry[3])OR(y[4] AND carry[3])",
 
   "MUX"   => "out := (sel & in2) | (!sel & in1)",
 

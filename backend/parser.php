@@ -301,6 +301,14 @@ class Parser
   
   function Solve()
   {
+    /*
+    TODO: Check if there is a subset of inputs that is only ever used in
+          a subset of the functions,
+          and that subset of function does not refer to any other variables.
+          If there is, solve the components individually.
+    */
+    
+    
     $key       = $this->Lookup();
     $this->key = $key;
     $solvition = new Solver($key);

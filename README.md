@@ -73,6 +73,11 @@ As an intermediate step, this script generates two sets of output:
 
 To run import.php, use this command: `import_through_shell.php | bash`
 
+#### import_mysql.php
+
+An option to import into a MySQL database is also provided.
+It may be a little bit more efficient.
+
 ## Data format
 
 ### gatebuilder results
