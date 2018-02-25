@@ -5,7 +5,8 @@ require 'backend/predefs.php';
 
 $n = new Parser;
 
-$n->Parse($predefs['HALFADDER']);
+#$n->Parse('x IMP (y IMP x)');
+$n->Parse($predefs['FULLADDER2B']);
 $n->Evaluate();
 $n->Analyze();
 $n->Solve();

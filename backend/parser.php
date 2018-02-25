@@ -385,7 +385,11 @@ class Parser
   {
     foreach($this->output_names as $index=>$name)
     {
-      $phrase = preg_replace('/\b'.$name.'\b/', '('.$this->phrases[$index].')', $phrase);
+      $prev = ''; if(ctype_alpha($name[0])) $prev = '\b';
+      $aft  = ''; if(ctype_alpha($name[strlen($name)-1])) $aft = '\b';
+      $phrase = preg_replace('/'.$prev.preg_quote($name).$aft.'/',
+                             '('.$this->phrases[$index].')',
+                             $phrase);
     }
     #print "Parsing $phrase\n";
 

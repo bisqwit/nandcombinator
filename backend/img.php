@@ -18,7 +18,7 @@ $key = preg_replace('@[^A-Za-z0-9+/]@', '', $key);
 
 $tokens      = Array();
 $connections = Array();
-preg_match_all('/('.PORT_REGEX.')=('.NAME_REGEX.')/', urldecode($_SERVER['QUERY_STRING']), $mat);
+preg_match_all('/('.PORT_REGEX.')=('.NAME_REGEX.'|[01])/', urldecode($_SERVER['QUERY_STRING']), $mat);
 foreach($mat[1] as $k=>$v)
 {
   $k = preg_replace('/\\..*/', '', $k);
@@ -100,6 +100,7 @@ function ShellFix($s)
   return "'".str_replace("'", "'\''", $s)."'";
 }
 $dot_src = ob_get_clean();
+
 exec("echo ".Shellfix($dot_src)."| /usr/bin/dot -Tsvg /dev/stdin", $lines);
 
 foreach($lines as $line)

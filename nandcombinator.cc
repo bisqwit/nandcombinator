@@ -567,7 +567,7 @@ int main()
     for(unsigned num_inputs=1; num_inputs<=global_max_inputs; ++num_inputs)
     for(unsigned num_gates=1; num_gates<=global_max_gates; ++num_gates)
     {
-        if(num_inputs != 3) continue;
+        if(num_inputs != 2) continue;
         //if(num_gates>5)continue;
         //if(num_inputs<6)continue;
         choices.push_back( (num_inputs<<10) + (num_gates<<0) );

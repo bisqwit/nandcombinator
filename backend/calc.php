@@ -1,14 +1,21 @@
 <?php
 
-require 'parser.php';
-require 'predefs.php';
-require 'possible304.php';
-
 $function = @$_REQUEST['f'] or '0';
 if(isset($argv))
   $function = $argv[1];
 elseif(strlen($_SERVER['PATH_INFO']) > 1)
   $function = substr($_SERVER['PATH_INFO'], 1);
+
+if($function == 's')
+{
+  require 'stats.php';
+  exit;
+}
+
+require 'parser.php';
+require 'predefs.php';
+require 'possible304.php';
+
 
 $n = new Parser;
 $n->Parse($function);
