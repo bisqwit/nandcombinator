@@ -33,6 +33,7 @@ class Solver
     $tablename = sprintf("conundrum_%d_%d", $num_inputs, $num_outputs);
 
     $stmt = $db->prepare("SELECT gates,connections FROM $tablename WHERE logic=?");
+    if(!$stmt) return;
     $stmt->bind_param('s', $key);
     $stmt->execute();
     $stmt->bind_result($this->num_gates, $connections);

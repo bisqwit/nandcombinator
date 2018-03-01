@@ -166,7 +166,7 @@ static void CreateNANDcombinations(unsigned num_gates, unsigned num_inputs)
         for(unsigned n=0; n<num_gates; ++n)
         {
         p:; unsigned pair = gate_inputs[n*2+0] + gate_inputs[n*2+1]*num_sources;
-            if(used.test(pair)) { if(n<2) goto reloop; ++gate_inputs[n*2+1]; goto p; }
+            if(used.test(pair)) { if(n*2 < 4) goto reloop; ++gate_inputs[n*2+1]; goto p; }
             used.set(pair);
         }}
 

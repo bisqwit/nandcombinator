@@ -14,10 +14,17 @@ foreach(glob($path.'datalog_*.dat') as $filename)
   $outputs = $mat[2];
   
   #if($inputs == 3 && $outputs < 7) continue;
+  if($inputs != 3 || $outputs < 8) continue;
+  #if($inputs != 9 || $outputs < 6) continue;
   #if(filesize($filename) > 19115522) continue;
 
   # Length of the logic table: (2^inputs)*outputs bits
   #                            ceil(((2^inputs)*outputs+5+5)/6) characters (max. 174765 characters)
+  # ^ Primary key
+  #   MySQL limit for primary key is 1000 bytes
+  #   Can still do 9 inputs, 11 gates
+  #   Or          10 inputs, 5 gates
+  #   Or           8 inputs, 23 gates
   # Length of connections:     ceil((num_gates*2*6+num_outputs*5)/6) characters (max. 46 characters)
   # Assuming max 16 inputs, 16 outputs, 16 gates
 
@@ -27,13 +34,23 @@ foreach(glob($path.'datalog_*.dat') as $filename)
   $db = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
   
   $tablename = sprintf("conundrum_%d_%d", $inputs, $outputs);
+  
+  $max_gates = 11;
+  $key_size  = ceil(((1 << $inputs)*$outputs + 5+5) / 6);
+  $conn_size = ceil(($max_gates*2*6+$outputs*5) / 6);
 
+  $logictype = 'BLOB';
+  if($key_size <= 255)
+  {
+    $logictype = "VARBINARY($key_size)";
+  }
+  
   $db->real_query("DROP TABLE {$tablename}");
   $db->real_query("CREATE TABLE {$tablename}(
   gates       TINYINT UNSIGNED NOT NULL,
-  logic       BLOB        NOT NULL,
-  connections VARCHAR(46) NOT NULL,
-  PRIMARY KEY(logic(32)), KEY g(gates)
+  logic       $logictype NOT NULL,
+  connections VARCHAR($conn_size) NOT NULL,
+  PRIMARY KEY(logic($key_size)), KEY g(gates)
 ) ENGINE=MYISAM");
   print $db->error;
   

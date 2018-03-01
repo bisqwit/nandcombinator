@@ -61,18 +61,31 @@ class Parser
     {
       $s = trim($sub_phrase);
       if(strlen($s))
-       $this->ParseOne($s, $index++);
+       $this->ParseOne($s, $index);
     }
+    foreach($this->phrases as $k=>$v)
+      if(!isset($this->operations[$k]))
+        unset($this->phrases[$k]);
   }
 
-  function ParseOne($phrase, $index)
+  function ParseOne($phrase, &$index)
   {
+    $keep = true;
     $name = "out{$index}";
-    if(preg_match('/^\s*('.NAME_REGEX.')\s*:=\s*(.*)$/', $phrase, $mat))
+    if(preg_match('/^\s*('.NAME_REGEX.')\s*(:=|=)\s*(.*)$/', $phrase, $mat))
     {
-      $name   = $mat[1];
-      $phrase = $mat[2];
+      $name     = $mat[1];
+      $operator = $mat[2];
+      $phrase   = $mat[3];
+      if($operator == '=') $keep = false;
     }
+    if(!$keep)
+    {
+      $this->phrases[0x4000|$index]      = $phrase;
+      $this->output_names[0x4000|$index] = $name;
+      return;
+    }
+
     $this->phrases[$index]      = $phrase;
     $this->output_names[$index] = $name;
     $this->operations[$index]   = $this->DoParse($phrase);
@@ -118,6 +131,7 @@ class Parser
     else               $this->interpreted_phrases[$name] = Array(array_pop($stack1), array_pop($stack2));
 
     $this->parse_errors = $errors;
+    ++$index;
   }
   
   // Evalute: Input: $phrases[], $operations[], $variables[]
@@ -391,13 +405,21 @@ class Parser
   
   private function DoParse($phrase)
   {
-    foreach($this->output_names as $index=>$name)
+    for(;;)
     {
-      $prev = ''; if(ctype_alpha($name[0])) $prev = '\b';
-      $aft  = ''; if(ctype_alpha($name[strlen($name)-1])) $aft = '\b';
-      $phrase = preg_replace('/'.$prev.preg_quote($name).$aft.'/',
-                             '('.$this->phrases[$index].')',
-                             $phrase);
+      $changes = false;
+      foreach($this->output_names as $index=>$name)
+      {
+        $prev = ''; if(ctype_alpha($name[0])) $prev = '\b';
+        $aft  = ''; if(ctype_alpha($name[strlen($name)-1])) $aft = '\b';
+        $before = $phrase;
+        $phrase = preg_replace('/'.$prev.preg_quote($name).$aft.'/',
+                               '('.$this->phrases[$index].')',
+                               $phrase);
+        if($before != $phrase) $changes = true;
+        if(strlen($phrase) > 8192) break; // DoS prevention
+      }
+      if(!$changes) break;
     }
     #print "Parsing $phrase\n";
 

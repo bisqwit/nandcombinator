@@ -37,7 +37,7 @@ public:
         align_factor = pos - pos_aligned_down;
 
         size = length + align_factor;
-        ptr =  mmap64(NULL, size,
+        ptr =  mmap64(nullptr, size,
                       Write ? (PROT_READ | PROT_WRITE)
                             : PROT_READ
                       , MAP_SHARED,
